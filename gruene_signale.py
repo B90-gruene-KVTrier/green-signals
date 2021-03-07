@@ -351,7 +351,15 @@ readConfig()
 
 if os.path.exists(localPath) == False:
     print("local path containing media files not found")
-    exit(1)
+    if remoteURL != None:
+        print("startng initial media download")
+        autoUpdate = RemoteData()
+        result = autoUpdate.downloadRemote()
+        if result == False:
+            print("updating the media data failed")
+    else:
+        print("add Mediafiles to "+localPath+" or configure Remote URL")
+        exit(0)
 
 slideShow = HiddenRoot()
 slideShow.bind("<Escape>", lambda e: slideShow.destroy())  # exit on esc
