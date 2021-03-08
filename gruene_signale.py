@@ -33,7 +33,7 @@ remoteURL = None
 localPathExists = False
 
 # below file extensions are accepted for images
-image_extensions = ['png', 'jpg']
+image_extensions = ['png', 'jpg', 'jpeg']
 #below file extensions are accepted for videos
 movie_extensions = ['mov', 'mp4', 'm4v']
 
