@@ -9,6 +9,7 @@ import tkinter as tk
 import sys
 import shutil
 import os
+import time
 # imporrt the standard to read and write config files
 import configparser
 # threading is used during playback
@@ -37,8 +38,9 @@ image_extensions = ['png', 'jpg', 'jpeg']
 #below file extensions are accepted for videos
 movie_extensions = ['mov', 'mp4', 'm4v']
 
+
 #start update with 2nd media - but only once
-update=2
+update=0
 
 def readConfig(configFile=None):
     global bild_dauer, DEBUG_PREVIEW, localPath, remoteURL, localPathExists
@@ -90,26 +92,29 @@ class RemoteData:
         self.localUnZIP = "./temp"
         self.failed = False
 
-    def downloadRemote(self):
-        if self.offline == True:
-            print("Configured for offline mode, add a 'path:remote' entry into the config file")
-            return True
+    def downloadRemote(self,ui):
         #stream the remote path into download.zip
+        if self.offline == True:
+            return True
         r = requests.get(self.remoteURL, stream = True)
         if r.status_code != 200:
-            print("URL %(url)s can't be loaded. Status Code = %(status)d" % {'url':self.remoteURL, 'status':r.status_code})
+            ui.showInfo("Die URL '%(url)s' kann nicht geladen werden. Status Code = %(status)d" % {'url':self.remoteURL, 'status':r.status_code},True)
+            time.sleep(5)
             self.failed = True
         else:
             #print(r.headers)
             length = 0
-            print("download to %s" % self.localZIP)
+            ui.showInfo("Die Daten werden geladen:",True)
+            #print("download to %s" % self.localZIP)
             with open(self.localZIP, "wb") as zipped:
                 for chunk in r.iter_content(chunk_size = 4096):
                     if chunk:
                         zipped.write(chunk)
                         length += len(chunk)
-                        print("%d kB" % (length/1024), end="\r")
-            print("successful download of %d kB of data" % (length/1024))
+                        ui.showInfo("Daten werden geladen: %d kB" % (length/1024))
+                        #print("%d kB" % (length/1024), end="\r")
+            ui.showInfo("Daten wurden erfolgreich geladen: %d kB" % (length/1024))
+            time.sleep(1)
             result = self.updateLocalData()
             if result == True:
                 os.remove(self.localZIP)
@@ -140,7 +145,7 @@ class RemoteData:
             shutil.rmtree(localPath+".old", True, None)
         localPathExists = True
         
-# this class simply cares about the fullscreen backdrop and starts playback
+# this class creates an invisible window to catch keboard events
 class HiddenRoot(tk.Tk):
     def __init__(self):
         global bild_dauer
@@ -167,82 +172,63 @@ class HiddenRoot(tk.Tk):
         self.window.destroy()
         exit(0)
 
-    def updateMedia(self):
-        self.window.updateMedia()
 
 # this class contains some info about media files
 # it includes some media meta data especially duration of video clips
 class Mediafile:
-    def __init__(self,filename,vlcinstance):
+    def __init__(self,filename,caller):
         self.filename = filename
         self.type = "unknown"
         self.duration = 0
         self.valid = False
         extension = os.path.basename(filename).split(".")[-1]
         if extension in image_extensions:
-            print("image file:        "+filename)
+            print("image file:        "+os.path.basename(filename))
             self.valid = True
         elif extension in movie_extensions:
-            media = vlcinstance.media_new(filename)
+            media = caller.instance.media_new(filename)
             media.parse()
             self.duration = media.get_duration()
             self.valid = True
-            print("movie file:        "+filename+ " (%d Sekunden)"%(self.duration/1000))
+            print("movie file:        "+os.path.basename(filename)+ " (%d Sekunden)"%(self.duration/1000))
         else:
-            print("unknwon file type: "+filename)
+            print("unknwon file type: "+os.path.basename(filename))
 
-class ttkTimer(Thread):
-    """a class serving same function as wxTimer... but there may be better ways to do this
-    """
-    def __init__(self, callback, tick):
-        Thread.__init__(self)
-        self.callback = callback
-        self.stopFlag = Event()
-        self.tick = tick
-        self.iters = 0
-
-    def run(self):
-        while not self.stopFlag.wait(self.tick):
-            self.iters += 1
-            self.callback()
-
-    def stop(self):
-        self.stopFlag.set()
-
-    def get(self):
-        return self.iters
 
 class MySlideShow(tk.Toplevel):
     def __init__(self, *args, **kwargs):
         tk.Toplevel.__init__(self, *args, **kwargs)
         #remove window decorations 
         self.overrideredirect(True)
-        self.paused = False
         self.info = None
+        self.infoText = tk.StringVar()
+        #by default info widget is hidden
+        self.infoHidden = True
+        self.bg = (0,0,0)
 
+        #intialize the timer for the slideshow
+        self.paused = False
+        self.timer = None
+
+        #set the geometry of the playback window
         self.scr_w, self.scr_h = self.winfo_screenwidth(), self.winfo_screenheight()
         if DEBUG_PREVIEW == None or DEBUG_PREVIEW == True:
             self.scr_w = int(self.scr_w / 4)
             self.scr_h = int(self.scr_h / 4)
             self.scr_t = self.scr_h*3 - 10
             self.scr_l = self.scr_w*3 - 10
+            self.font = "Courier 8"
         else:
             self.scr_t = 0
             self.scr_l = 0
-        print(self.scr_w,self.scr_h)
+            self.font = "Courier 12"
 
-        #save reference to photo so that garbage collection
-        #does not clear image variable in show_image()
-        self.persistent_image = None
-        self.mediaList = list()
-        self.bgcolor = (0,0,0)
-
-        # This creates the widget where files are played back
+        #This creates the widget where files are played back
         self.player = None
         self.videopanel = tk.Frame(self, bg="black")
         self.videopanel.pack(side="top",fill=tk.BOTH,expand=1)
 
-        # VLC player init
+        #VLC player init
         self.instance = vlc.Instance("--no-xlib --quiet --fullscreen --")
         self.player = self.instance.media_player_new()
         self.player.video_set_scale(0)
@@ -251,24 +237,47 @@ class MySlideShow(tk.Toplevel):
         self.player.video_set_mouse_input(False)
         self.player.video_set_key_input(False)
 
-        # get Media Files
-        self.getMedia()
-        #self.updateMedia()
+        #setup the window
+        self.wm_geometry("{}x{}+{}+{}".format(self.scr_w, self.scr_h,self.scr_l,self.scr_t))
+        self.player.set_xwindow(self.GetHandle()) # this line messes up windows
+        
+        #some brief internal initializers
+        self.mediaList = list()
+        self.pixNum = 0
 
-    def showInfo(self,_text):
+    def startup(self):
+        if os.path.exists(localPath) == False:
+            self.showInfo("Der Pfad '%s' wurde nicht gefunden" % localPath, True)
+            time.sleep(1)
+            if remoteURL == None:
+                tk.messagebox.showerror("Keine Medien gefunden", "Das Verzeichnis\n'"+localPath+"'\nwurde nicht gefunden.")
+                exit(0)
+        #get Media Files
+        self.showInfo("Grüne Signale wird gestartet", True)
+        time.sleep(1)
+        self.updateMedia()
+
+    def toggleInfo(self):
         # This creates an info widget
-        if self.info == None:
-            print("ShowInfo: "+_text)
-            self.info = tk.Label(self, bg="#00FF44", height=1, width=int(self.scr_w/9), text=_text)
-            self.info.place(x=0,y=0)
+        if self.infoHidden == True or self.info == None:
+            self.infoHidden = False
+            self.info = tk.Label(self, bg="#00FF44", font=self.font, height=-1, width=-1, textvariable=self.infoText, wraplength=self.scr_w-16)
+            self.info.place(x=8,y=6)
         else:
-            self.info.configure(text=_text)
-
-    def hideInfo(self):
-        if self.info != None:
-            print("Hide info")
+            self.infoHidden = True
             self.info.destroy()
             self.info = None
+             
+         
+    def showInfo(self,_text,_force=False):
+        if self.infoHidden == True and _force == True:
+            self.toggleInfo()
+        self.infoText.set(_text)
+        self.update()
+            
+    def hideInfo(self):
+        if self.infoHidden == False:
+            self.toggleInfo()
 
     def getMedia(self):
         '''
@@ -276,46 +285,47 @@ class MySlideShow(tk.Toplevel):
         '''
         curr_dir = localPath
         self.pixNum = 0
+        self.mediaList=list()
 
         for root, dirs, files in os.walk(curr_dir):
             for f in files:
                 if f.startswith("._"):
                     continue
-                item = Mediafile(os.path.join(root, f),self.instance)
+                item = Mediafile(os.path.join(root, f),self)
                 if item.valid == True:
                     self.mediaList.append(item)
         self.mediaList.sort(key=operator.attrgetter('filename'))
+        if len(self.mediaList) == 0:
+            tk.messagebox.showerror("Keine Medien gefunden", "Im Pfad/n'"+localpath+"'/nwurden keine Mediendateien gefunden")
+            self.destroy()
+            exit(1)
+        else:
+            self.showInfo("%d Medien gefunden" % len(self.mediaList))
+            time.sleep(2)
+        self.hideInfo()
 
     def startSlideShow(self):
-        self.paused = False
-        if len(self.mediaList) < 1:
-            # nothing to show, so abort
-            print("no media files found")
-            exit(1)
-
-        self.wm_geometry("{}x{}+{}+{}".format(self.scr_w, self.scr_h,self.scr_l,self.scr_t))
-        self.player.set_xwindow(self.GetHandle()) # this line messes up windows
-        self.nextMedia()
+        self.after(500,self.startup)
 
     def nextMedia(self):
         global bild_dauer, update
         if self.paused == True:
+            if self.timer != None:
+                self.after_cancel(self.timer)
+                self.timer=None
             return
+        print(self.pixNum)
         media = self.mediaList[self.pixNum]
         self.pixNum = (self.pixNum + 1) % len(self.mediaList)
         self.showMedia(media)
-        if update > 0:
-            if update==1:
-                self.updateMedia()
-            update -= 1
         #its like a callback function after n seconds (cycle through pics)
-        # movie should be played up to the end
-        # images shall be shown as given in delays
-        timer = media.duration
-        if timer <= 0:
-            timer = bild_dauer * 1000
-        # print(media.filename, timer/1000)
-        self.after(timer, self.nextMedia)
+        #movie should be played up to the end
+        #images shall be shown as given in delays
+        duration = media.duration
+        if duration <= 0:
+            duration = bild_dauer * 1000
+        self.showInfo(os.path.basename(media.filename) + " (%d Sekunden)"%(duration/1000))
+        self.timer = self.after(duration, self.nextMedia)
 
     def showMedia(self, media):
         _media = self.instance.media_new(media.filename)
@@ -324,46 +334,57 @@ class MySlideShow(tk.Toplevel):
         self.player.audio_set_mute(True)
         self.player.play()
 
+
     def pausePlayback(self):
         self.paused = True
-        
+        if self.timer != None:
+            self.after_cancel(self.timer)
+        self.timer = None
+        self.player.stop()
+
+    def resumePlayback(self):
+        if self.paused == True:
+            self.paused = False
+            if self.timer != None:
+                self.after_cancel(self.timer)
+            self.timer = None
+    
+    def togglePlayback(self):
+        if self.paused == True:
+            self.resumePlayback()
+            self.nextMedia()
+        else:
+            self.pausePlayback()
+
     def updateMedia(self):
         global update
+        self.pausePlayback()
         if remoteURL != None:
-            self.showInfo("Update Media Files")
-            self.pausePlayback()
+            self.showInfo("Neue Medien werden geladen", True)
+            time.sleep(2)
             update = RemoteData()
-            result = update.downloadRemote()
-            self.hideInfo()
+            result = update.downloadRemote(self)
+        else:
+            self.showInfo("Es ist keine Remote-URL konfiguriert.",True)
+            time.sleep(2)
         update = 0
         self.getMedia()
-        self.startSlideShow()
+        self.hideInfo()
+        self.resumePlayback()
+        self.nextMedia()
         
     def GetHandle(self):
         return self.videopanel.winfo_id()
 
 ## ENTRY POINT ##
 readConfig()
-#autoUpdate = RemoteData()
-#result = autoUpdate.downloadRemote()
-#if result == False:
-#    print("updating the media data failed")
-
-if os.path.exists(localPath) == False:
-    print("local path containing media files not found")
-    if remoteURL != None:
-        print("startng initial media download")
-        autoUpdate = RemoteData()
-        result = autoUpdate.downloadRemote()
-        if result == False:
-            print("updating the media data failed")
-    else:
-        print("add Mediafiles to "+localPath+" or configure Remote URL")
-        exit(0)
 
 slideShow = HiddenRoot()
+
 slideShow.bind("<Escape>", lambda e: slideShow.destroy())  # exit on esc
 slideShow.bind("<Right>", lambda e: slideShow.nextMedia()) # right-arrow key for next image
 slideShow.bind("<Left>", lambda e: slideShow.previousMedia()) # left-arrow key for previous image
-slideShow.bind("U", lambda e: slideShow.updateMedia()) # start dwnload of new media
+slideShow.bind("U", lambda e: slideShow.window.updateMedia()) # start dwnload of new media
+slideShow.bind("P", lambda e: slideShow.window.togglePlayback()) # toggle playback
+slideShow.bind("i", lambda e: slideShow.window.toggleInfo()) # toggle display of info widget
 slideShow.mainloop()
