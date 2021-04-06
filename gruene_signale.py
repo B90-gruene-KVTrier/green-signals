@@ -73,7 +73,9 @@ def readConfig(configFile=None):
 
     #try to read the remote URL, if not given, work offline
     try:
-        remoteURL = config.get('pfad', 'remote')
+        remoteURL = config.get('pfad', 'remote').strip()
+        if len(remoteURL) == 0:
+            remoteURL = None
     except:
         remoteURL = None
 
