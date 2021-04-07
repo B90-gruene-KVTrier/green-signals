@@ -31,6 +31,9 @@ DEBUG_PREVIEW = False
 bild_dauer = 10
 localPath = "./slideshow"
 remoteURL = None
+#below URL downloads the Intro as zip - just for reference
+introURL="https://wolke.netzbegruenung.de/s/CE7CASzEeGF4px2/download"
+
 localPathExists = False
 
 # below file extensions are accepted for images
