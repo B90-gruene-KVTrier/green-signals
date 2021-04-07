@@ -29,6 +29,15 @@ bild_dauer=tk.IntVar()
 DEBUG_PREVIEW=tk.IntVar()
 localPath=tk.StringVar()
 remoteURL=tk.StringVar()
+energyMode=tk.IntVar()
+energyStart=tk.StringVar()
+energyStop=tk.StringVar()
+
+
+#when setup can't find the conf file, inited is set to True
+inited = False
+#URL for the Intro-Screens, use as default, if conf is inited
+introURL="https://wolke.netzbegruenung.de/s/CE7CASzEeGF4px2/download"
 
 #set "dirty" flag to False
 #any change should set it to True, so we can ask on quit to save data
@@ -83,22 +92,35 @@ def installModules():
             failed.append(module)
     modules=failed
 
-def setDirty():
+def validateTimeFields(input,newchar):
+    if newchar not in '01234567890:.':
+        return False
+    setDirty()
+    return True;
+
+def setDirty(ign=None):
     global isDirty
     isDirty = True
+    return True
+
 
 def readConfig(configFile=None):
-    global bild_dauer, DEBUG_PREVIEW, localPath, remoteURL, isDirty
+    global bild_dauer, DEBUG_PREVIEW, localPath, remoteURL, isDirty, inited
+    global energyStart, energyStop, energyMode
     if configFile == None:
         configFile = os.path.dirname(os.path.realpath(__file__)) + os.sep + "gruene_signale.conf"
+    if os.path.exists(configFile) == False:
+        inited = True
     config = configparser.ConfigParser()
     config.read(configFile)
+    #read bild - dauer
     try:
         bild_dauer.set(int(config.get('bilder', 'dauer')))
     except:
         bild_dauer.set(10)
         isDirty = True
 
+    #read debug - preview
     try:
         val = config.get('debug', 'preview')
     except:
@@ -106,6 +128,7 @@ def readConfig(configFile=None):
     if val == "1":
         DEBUG_PREVIEW.set(1)
 
+    #read pfad - lokal
     try:
         val = os.path.realpath(config.get('pfad', 'lokal'))
     except:
@@ -119,6 +142,26 @@ def readConfig(configFile=None):
     except:
         val = None
         remoteURL.set("")
+    
+    #read energ - mode
+    try:
+        energyMode.set(int(config.get('energy','mode')))
+    except:
+        energyMode.set(0)
+    
+    #read energy - start
+    try:
+        val = config.get('energy', 'start')
+    except:
+        val = ""
+    energyStart.set(val)
+    
+    #read energy - stop
+    try:
+        val = config.get('energy', 'stop')
+    except:
+        val = ""
+    energyStop.set(val)
 
 def writeConfig(configFile=None):
     if configFile == None:
@@ -126,17 +169,25 @@ def writeConfig(configFile=None):
     config = configparser.ConfigParser()
     config.read(configFile)
 
+    required_sections = ['bilder','filme','pfad','debug','energy']
+    for sect in required_sections:
+        if sect not in config.sections():
+            config.add_section( sect )
+
     config.set('bilder','dauer',"%d" % bild_dauer.get())
     config.set('debug', 'preview',"%d" % DEBUG_PREVIEW.get())
     config.set('pfad', 'lokal',localPath.get().strip())
     config.set('pfad', 'remote',remoteURL.get().strip())
+    config.set('energy', 'mode', "%d" % energyMode.get())
+    config.set('energy', 'start', energyStart.get())
+    config.set('energy', 'stop', energyStop.get())
 
     with open(configFile, 'w') as file:
         config.write(file)
 
 
 def save():
-    global isDirty
+    global isDirty,inited
     if isDirty == False:
         return;
     writeConfig()
@@ -145,8 +196,10 @@ def save():
     if checkAutostartfile() == 0 and doAutostart.get() == 1:
         createAutostart()
     isDirty=False
+    inited=False
 
 def quit():
+#    if isDirty == False:
     master.destroy()
     exit(0)
 
@@ -157,6 +210,14 @@ master.minsize(600,300)
 master.geometry("800x450+560+300")
 master.title("Einstellungen für Grüne Signale")
 
+#register callbacks for entry fields
+timeEntryCallback = master.register(validateTimeFields)
+anyEntryCallback = master.register(setDirty)
+
+#fixed value for pady and padx used by pack() function
+dy=2
+dx=4
+
 #add button or notification if Python modules (see above) needs to be installed
 row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
 lab=tk.Label(row,text="Python Module",width=30,anchor='w')
@@ -164,9 +225,9 @@ if len(modules) == 0:
     obj=tk.Label(row,text="installiert",fg="green")
 else:
     obj=tk.Button(row,text="Installieren",command=installModules,fg="red")
-row.pack(side=tk.TOP,padx=10,pady=10,expand=tk.YES,fill=tk.X)
-lab.pack(side=tk.LEFT,pady=10)
-obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=10)
+row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
 
 if checkAutostartfile():
     doAutostart.set(1)
@@ -175,42 +236,86 @@ if checkAutostartfile():
 row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
 lab=tk.Label(row,text="Grüne Signale automatisch starten",width=30,anchor='w')
 obj=tk.Checkbutton(row,text="aktiv",variable=doAutostart,command=setDirty)
-row.pack(side=tk.TOP,padx=10,pady=10,expand=tk.YES,fill=tk.X)
-lab.pack(side=tk.LEFT,pady=10)
-obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=10)
+row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
 
 #add entry field for local path
 row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
 lab=tk.Label(row,text="lokaler Pfad",width=30,anchor='w')
-obj=tk.Entry(row)
-obj.insert(10,localPath.get())
-row.pack(side=tk.TOP,padx=10,pady=10,expand=tk.YES,fill=tk.X)
-lab.pack(side=tk.LEFT,pady=10)
-obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=10)
+obj=tk.Entry(row,textvariable=localPath,validate="key",validatecommand=(anyEntryCallback, '%P'))
+row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
 
 #add entry field for remoteURL
 row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
 lab=tk.Label(row,text="Remote-URL (leer für Offline-Modus)",width=30,anchor='w')
-obj=tk.Entry(row)
-obj.insert(10,remoteURL.get())
-row.pack(side=tk.TOP,padx=10,pady=10,expand=tk.YES,fill=tk.X)
-lab.pack(side=tk.LEFT,pady=10)
-obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=10)
+if inited == True:
+    remoteURL.set(introURL)
+obj=tk.Entry(row,textvariable=remoteURL,validate="key",validatecommand=(anyEntryCallback, '%P'))
+row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
+
+#add scale widget for duration
+row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
+lab=tk.Label(row,text="Anzeigedauer für Bilder (Sekunden)",width=30,anchor='w')
+obj=tk.Scale(row,from_=5,to=120,variable=bild_dauer,orient=tk.HORIZONTAL,command=setDirty)
+row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
+
+#add controls for energy savings
+row1=tk.Frame(master,bd=1,relief=tk.SUNKEN)
+row1.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+
+row2=tk.Frame(row1,bd=1,relief=tk.FLAT)
+row2.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+
+row3=tk.Frame(row1,bd=1,relief=tk.FLAT)
+row3.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+row4=tk.Frame(row1,bd=1,relief=tk.FLAT)
+row4.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+
+lab=tk.Label(row2,text="Energiesparoptionen",width=30,anchor='w')
+obj0=tk.Radiobutton(row2,text="ohne",variable=energyMode,command=setDirty,value=0)
+obj1=tk.Radiobutton(row2,text="RasPi ausschalten",variable=energyMode,command=setDirty,value=1)
+obj2=tk.Radiobutton(row2,text="Monitor deaktivieren",variable=energyMode,command=setDirty,value=2)
+lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+obj2.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
+obj1.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
+obj0.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
+
+lab=tk.Label(row3,text="",width=30,anchor='w')
+lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+lab=tk.Label(row3,text="um",width=3,anchor='w')
+lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+obj1=tk.Entry(row3,textvariable=energyStart,validate="key",validatecommand=(timeEntryCallback, '%P','%S'))
+obj1.pack(side=tk.LEFT,fill=tk.X,padx=dx)
+
+#lab=tk.Label(row3,text="",width=30,anchor='w')
+#lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+lab=tk.Label(row3,text="bis",width=3,anchor='w')
+lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+obj2=tk.Entry(row3,textvariable=energyStop,validate="key",validatecommand=(timeEntryCallback, '%P', '%S'))
+obj2.pack(side=tk.LEFT,fill=tk.X,padx=dx)
+
 
 #add checkbox for Debug Preview Mode
 row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
 lab=tk.Label(row,text="Debug Preview Modus",width=30,anchor='w')
 obj=tk.Checkbutton(row,text="aktiv",variable=DEBUG_PREVIEW,command=setDirty)
-row.pack(side=tk.TOP,padx=10,pady=10,expand=tk.YES,fill=tk.X)
-lab.pack(side=tk.LEFT,pady=10)
-obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=10)
+row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
 
 #add buttons
 row=tk.Frame(master)
-saveButton=tk.Button(row,text="Übernehmen",command=save,pady=4,padx=10)
-saveButton.pack(side=tk.LEFT,pady=10,padx=10)
-quitButton=tk.Button(row,text="Beenden",command=quit,pady=4,padx=10)
-quitButton.pack(side=tk.RIGHT,pady=10,padx=10)
+saveButton=tk.Button(row,text="Übernehmen",command=save,pady=4,padx=dx)
+saveButton.pack(side=tk.LEFT,pady=dy,padx=dx)
+quitButton=tk.Button(row,text="Beenden",command=quit,pady=4,padx=dx)
+quitButton.pack(side=tk.RIGHT,pady=dy,padx=dx)
 row.pack(side=tk.BOTTOM)
 
 master.mainloop()
