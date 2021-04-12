@@ -92,8 +92,29 @@ def installModules():
             failed.append(module)
     modules=failed
 
-def validateTimeFields(input,newchar):
-    if newchar not in '01234567890:.':
+def validateTimeFields(input,newchar,action,name):
+    if action == "focusout":
+        if ":" in input:
+            hour=int(input.split(":")[0])
+            minute=int(input.split(":")[1])
+            if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+                tk.messagebox.showerror("Eingabefehler", "Bitte geben sie eine gültige Uhrzeit ein oder die Anzahl der Stunden mit vorangestelltem -")
+                master.nametowidget(name).focus()
+                return False
+            else:
+                print(name)
+                if ".start" in name:
+                    energyStart.set("%(h)d:%(m)02d" % {'h':hour, 'm':minute})
+                elif ".stop" in name:
+                    energyStop.set("%(h)d:%(m)02d" % {'h':hour, 'm':minute})
+                return True
+    if newchar == "-" and len(input) < 2:
+        setDirty()
+        return True
+    elif len(input)>0 and input[0] == "-" and newchar in "0123456789":
+        setDirty()
+        return True
+    elif newchar not in '01234567890:.':
         return False
     setDirty()
     return True;
@@ -203,12 +224,125 @@ def quit():
     master.destroy()
     exit(0)
 
+def buildGUI_1():
+    #add button or notification if Python modules (see above) needs to be installed
+    row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
+    lab=tk.Label(row,text="Python Module",width=30,anchor='w')
+    if len(modules) == 0:
+        obj=tk.Label(row,text="installiert",fg="green")
+    else:
+        obj=tk.Button(row,text="Installieren",command=installModules,fg="red")
+    row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+    lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+    obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
+    
+def buildGUI_2():
+    #add autostart checkbox
+    row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
+    lab=tk.Label(row,text="Grüne Signale automatisch starten",width=30,anchor='w')
+    obj=tk.Checkbutton(row,text="aktiv",variable=doAutostart,command=setDirty)
+    row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+    lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+    obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
 
+def buildGUI_3():
+    #add entry field for local path
+    row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
+    lab=tk.Label(row,text="lokaler Pfad",width=30,anchor='w')
+    obj=tk.Entry(row,textvariable=localPath,validate="key",validatecommand=(anyEntryCallback, '%P'))
+    row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+    lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+    obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
+
+def buildGUI_4():
+    #add entry field for remoteURL
+    row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
+    lab=tk.Label(row,text="Remote-URL (leer für Offline-Modus)",width=30,anchor='w')
+    if inited == True:
+        remoteURL.set(introURL)
+    obj=tk.Entry(row,textvariable=remoteURL,validate="key",validatecommand=(anyEntryCallback, '%P'))
+    row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+    lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+    obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
+
+def buildGUI_5():
+    #add scale widget for duration
+    row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
+    lab=tk.Label(row,text="Anzeigedauer für Bilder (Sekunden)",width=30,anchor='w')
+    obj=tk.Scale(row,from_=5,to=120,variable=bild_dauer,orient=tk.HORIZONTAL,command=setDirty)
+    row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+    lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+    obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
+
+def buildGUI_6():
+    #MARK: add controls for energy savings
+    row1=tk.Frame(master,bd=1,relief=tk.SUNKEN)
+    row1.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+
+    row2=tk.Frame(row1,bd=1,relief=tk.FLAT)
+    row2.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+
+    row3=tk.Frame(row1,bd=1,relief=tk.FLAT)
+    row3.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+    row4=tk.Frame(row1,bd=1,relief=tk.FLAT)
+    row4.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+
+    lab=tk.Label(row2,text="Energiesparoptionen",width=30,anchor='w')
+    obj0=tk.Radiobutton(row2,text="ohne",variable=energyMode,command=setDirty,value=0)
+    obj1=tk.Radiobutton(row2,text="RasPi ausschalten",variable=energyMode,command=setDirty,value=1)
+    obj2=tk.Radiobutton(row2,text="Monitor deaktivieren",variable=energyMode,command=setDirty,value=2)
+    lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+    obj2.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
+    obj1.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
+    obj0.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
+
+    lab=tk.Label(row3,text="",width=30,anchor='w')
+    lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+    lab=tk.Label(row3,text="um",width=3,anchor='w')
+    lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+    obj1=tk.Entry(row3,name="start",textvariable=energyStart,validate="all",validatecommand=(timeEntryCallback, '%P','%S', "%V", "%W"))
+    obj1.pack(side=tk.LEFT,fill=tk.X,padx=dx)
+
+    lab=tk.Label(row3,text="bis",width=3,anchor='w')
+    lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+    obj2=tk.Entry(row3,name="stop",textvariable=energyStop,validate="all",validatecommand=(timeEntryCallback, '%P', '%S', "%V", "%W"))
+    obj2.pack(side=tk.LEFT,fill=tk.X,padx=dx)
+    
+def buildGUI_7():
+    #add checkbox for Debug Preview Mode
+    row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
+    lab=tk.Label(row,text="Debug Preview Modus",width=30,anchor='w')
+    obj=tk.Checkbutton(row,text="aktiv",variable=DEBUG_PREVIEW,command=setDirty)
+    row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
+    lab.pack(side=tk.LEFT,pady=dy,padx=dx)
+    obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
+
+def buildGUI_8():
+    #add buttons
+    row=tk.Frame(master)
+    saveButton=tk.Button(row,text="Übernehmen",command=save,pady=4,padx=dx)
+    saveButton.pack(side=tk.LEFT,pady=dy,padx=dx)
+    quitButton=tk.Button(row,text="Beenden",command=quit,pady=4,padx=dx)
+    quitButton.pack(side=tk.RIGHT,pady=dy,padx=dx)
+    row.pack(side=tk.BOTTOM)
+
+def buildGUI():
+    buildGUI_1()
+    buildGUI_2()
+    buildGUI_3()
+    buildGUI_4()
+    buildGUI_5()
+    buildGUI_6()
+    buildGUI_7()
+    buildGUI_8()
+    
+    
 readConfig()
 
 master.minsize(600,300)
 master.geometry("800x450+560+300")
 master.title("Einstellungen für Grüne Signale")
+master.option_add('*Dialog.msg.font', 'System 10')
 
 #register callbacks for entry fields
 timeEntryCallback = master.register(validateTimeFields)
@@ -218,104 +352,6 @@ anyEntryCallback = master.register(setDirty)
 dy=2
 dx=4
 
-#add button or notification if Python modules (see above) needs to be installed
-row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
-lab=tk.Label(row,text="Python Module",width=30,anchor='w')
-if len(modules) == 0:
-    obj=tk.Label(row,text="installiert",fg="green")
-else:
-    obj=tk.Button(row,text="Installieren",command=installModules,fg="red")
-row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
-lab.pack(side=tk.LEFT,pady=dy,padx=dx)
-obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
-
-if checkAutostartfile():
-    doAutostart.set(1)
-
-#add autostart checkbox
-row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
-lab=tk.Label(row,text="Grüne Signale automatisch starten",width=30,anchor='w')
-obj=tk.Checkbutton(row,text="aktiv",variable=doAutostart,command=setDirty)
-row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
-lab.pack(side=tk.LEFT,pady=dy,padx=dx)
-obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
-
-#add entry field for local path
-row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
-lab=tk.Label(row,text="lokaler Pfad",width=30,anchor='w')
-obj=tk.Entry(row,textvariable=localPath,validate="key",validatecommand=(anyEntryCallback, '%P'))
-row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
-lab.pack(side=tk.LEFT,pady=dy,padx=dx)
-obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
-
-#add entry field for remoteURL
-row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
-lab=tk.Label(row,text="Remote-URL (leer für Offline-Modus)",width=30,anchor='w')
-if inited == True:
-    remoteURL.set(introURL)
-obj=tk.Entry(row,textvariable=remoteURL,validate="key",validatecommand=(anyEntryCallback, '%P'))
-row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
-lab.pack(side=tk.LEFT,pady=dy,padx=dx)
-obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
-
-#add scale widget for duration
-row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
-lab=tk.Label(row,text="Anzeigedauer für Bilder (Sekunden)",width=30,anchor='w')
-obj=tk.Scale(row,from_=5,to=120,variable=bild_dauer,orient=tk.HORIZONTAL,command=setDirty)
-row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
-lab.pack(side=tk.LEFT,pady=dy,padx=dx)
-obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
-
-#add controls for energy savings
-row1=tk.Frame(master,bd=1,relief=tk.SUNKEN)
-row1.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
-
-row2=tk.Frame(row1,bd=1,relief=tk.FLAT)
-row2.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
-
-row3=tk.Frame(row1,bd=1,relief=tk.FLAT)
-row3.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
-row4=tk.Frame(row1,bd=1,relief=tk.FLAT)
-row4.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
-
-lab=tk.Label(row2,text="Energiesparoptionen",width=30,anchor='w')
-obj0=tk.Radiobutton(row2,text="ohne",variable=energyMode,command=setDirty,value=0)
-obj1=tk.Radiobutton(row2,text="RasPi ausschalten",variable=energyMode,command=setDirty,value=1)
-obj2=tk.Radiobutton(row2,text="Monitor deaktivieren",variable=energyMode,command=setDirty,value=2)
-lab.pack(side=tk.LEFT,pady=dy,padx=dx)
-obj2.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
-obj1.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
-obj0.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
-
-lab=tk.Label(row3,text="",width=30,anchor='w')
-lab.pack(side=tk.LEFT,pady=dy,padx=dx)
-lab=tk.Label(row3,text="um",width=3,anchor='w')
-lab.pack(side=tk.LEFT,pady=dy,padx=dx)
-obj1=tk.Entry(row3,textvariable=energyStart,validate="key",validatecommand=(timeEntryCallback, '%P','%S'))
-obj1.pack(side=tk.LEFT,fill=tk.X,padx=dx)
-
-#lab=tk.Label(row3,text="",width=30,anchor='w')
-#lab.pack(side=tk.LEFT,pady=dy,padx=dx)
-lab=tk.Label(row3,text="bis",width=3,anchor='w')
-lab.pack(side=tk.LEFT,pady=dy,padx=dx)
-obj2=tk.Entry(row3,textvariable=energyStop,validate="key",validatecommand=(timeEntryCallback, '%P', '%S'))
-obj2.pack(side=tk.LEFT,fill=tk.X,padx=dx)
-
-
-#add checkbox for Debug Preview Mode
-row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
-lab=tk.Label(row,text="Debug Preview Modus",width=30,anchor='w')
-obj=tk.Checkbutton(row,text="aktiv",variable=DEBUG_PREVIEW,command=setDirty)
-row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
-lab.pack(side=tk.LEFT,pady=dy,padx=dx)
-obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
-
-#add buttons
-row=tk.Frame(master)
-saveButton=tk.Button(row,text="Übernehmen",command=save,pady=4,padx=dx)
-saveButton.pack(side=tk.LEFT,pady=dy,padx=dx)
-quitButton=tk.Button(row,text="Beenden",command=quit,pady=4,padx=dx)
-quitButton.pack(side=tk.RIGHT,pady=dy,padx=dx)
-row.pack(side=tk.BOTTOM)
+buildGUI()
 
 master.mainloop()
