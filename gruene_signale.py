@@ -20,6 +20,8 @@ import operator
 import zipfile
 # used for downloading the fles from remote
 import requests
+# used to call to shutdown or vcgencmd
+import subprocess
 
 # below lines for develepment only
 # When DEBUG_PREVIEW is set to True, then te dislay will only cover
@@ -172,6 +174,10 @@ class HiddenRoot(tk.Tk):
             self.window.pixNum = self.window.pixNum + len(self.window.mediaList)
         self.window.nextMedia()
         
+    def shutdown(self):
+        subprocess.check_call(["shutdown","--no-wall","+1"])
+        self.destroy()
+
     def destroy(self):
         self.window.player.stop()
         self.window.destroy()
@@ -319,7 +325,7 @@ class MySlideShow(tk.Toplevel):
                 self.after_cancel(self.timer)
                 self.timer=None
             return
-        print(self.pixNum)
+        #print(self.pixNum)
         media = self.mediaList[self.pixNum]
         self.pixNum = (self.pixNum + 1) % len(self.mediaList)
         self.showMedia(media)
@@ -378,6 +384,18 @@ class MySlideShow(tk.Toplevel):
         self.resumePlayback()
         self.nextMedia()
         
+    def blankScreenOn(self):
+        #energy savings - start blank screen
+        self.pausePlayback()
+        subprocess.check_call(["vcgencmd","display_power","0"])
+        time.sleep(10)
+        self.blankScreenOff()
+        
+    def blankScreenOff(self):
+        #energy savings - end blank screen
+        self.updateMedia()
+        subprocess.check_call(["vcgencmd","display_power","1"])
+
     def GetHandle(self):
         return self.videopanel.winfo_id()
 
@@ -389,7 +407,12 @@ slideShow = HiddenRoot()
 slideShow.bind("<Escape>", lambda e: slideShow.destroy())  # exit on esc
 slideShow.bind("<Right>", lambda e: slideShow.nextMedia()) # right-arrow key for next image
 slideShow.bind("<Left>", lambda e: slideShow.previousMedia()) # left-arrow key for previous image
-slideShow.bind("U", lambda e: slideShow.window.updateMedia()) # start dwnload of new media
+slideShow.bind("U", lambda e: slideShow.window.updateMedia()) # start download of new media
 slideShow.bind("P", lambda e: slideShow.window.togglePlayback()) # toggle playback
 slideShow.bind("i", lambda e: slideShow.window.toggleInfo()) # toggle display of info widget
+
+if DEBUG_PREVIEW == 1:
+    #some featurres are only availade whith DEBUG Preview enabled
+    slideShow.bind("B", lambda e: slideShow.window.blankScreenOn()) # briefly test blank screen feature
+    slideShow.bind("S", lambda e: slideShow.shutdown()) # schedule shutdown and exit the slideshow
 slideShow.mainloop()

@@ -18,10 +18,10 @@ try:
 except:
     modules.append("python-vlc")
 
-try:
-    import crontab
-except:
-    modules.append("python-crontab")
+# try:
+#     import crontab
+# except:
+#     modules.append("python-crontab")
 
 #init variables used in config file and some other places
 doAutostart=tk.IntVar()
