@@ -233,6 +233,8 @@ class MySlideShow(tk.Toplevel):
             self.scr_t = 0
             self.scr_l = 0
             self.font = "Courier 12"
+            # hide the mouse cursor if not in debug mode
+            self.config(cursor="none")
 
         #This creates the widget where files are played back
         self.player = None
