@@ -34,7 +34,7 @@ bild_dauer = 10
 localPath = "./slideshow"
 remoteURL = None
 #below URL downloads the Intro as zip - just for reference
-introURL="https://wolke.netzbegruenung.de/s/CE7CASzEeGF4px2/download"
+introURL="https://wolke.netzbegruenung.de/s/2TPGWN5FtWYy2d8/download"
 
 localPathExists = False
 
@@ -46,6 +46,10 @@ movie_extensions = ['mov', 'mp4', 'm4v']
 
 #start update with 2nd media - but only once
 update=0
+
+#some variables related to system clock and energ savings
+clockInSync=False
+clockTimer=None
 
 def readConfig(configFile=None):
     global bild_dauer, DEBUG_PREVIEW, localPath, remoteURL, localPathExists
@@ -398,6 +402,15 @@ class MySlideShow(tk.Toplevel):
         self.updateMedia()
         subprocess.check_call(["vcgencmd","display_power","1"])
 
+    def checkNTPClock(self):
+        global clockInSync
+        # timedatectl show tells me, if the clock is synchronized via NTP
+        for line in subprocess.check_output(["timedatectl","show"]).split():
+            if line.decode().split("=")[0] == "NTPSynchronized" and line.decode().split("=")[1] == "yes":
+                clockInSync=True
+        #if clockInSync == False:
+        #    clockTimer=self.after(60*1000,self.checkNTPClock)
+        
     def GetHandle(self):
         return self.videopanel.winfo_id()
 

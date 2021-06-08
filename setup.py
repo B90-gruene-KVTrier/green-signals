@@ -37,7 +37,7 @@ energyStop=tk.StringVar()
 #when setup can't find the conf file, inited is set to True
 inited = False
 #URL for the Intro-Screens, use as default, if conf is inited
-introURL="https://wolke.netzbegruenung.de/s/CE7CASzEeGF4px2/download"
+introURL="https://wolke.netzbegruenung.de/s/2TPGWN5FtWYy2d8/download"
 
 #set "dirty" flag to False
 #any change should set it to True, so we can ask on quit to save data
