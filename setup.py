@@ -51,7 +51,7 @@ def createAutostart():
     '''
     autostartfile = os.path.expanduser("~/.config/autostart/gruene_signale.desktop")
     whereami = os.path.dirname(os.path.realpath(__file__))
-    contents = """[Desktop Entry]
+    contents = u"""[Desktop Entry]
 Type=Application
 Name=Green Signals Autostart
 Comment=Starten der Slideshow von Grüne Signale
@@ -98,7 +98,7 @@ def validateTimeFields(input,newchar,action,name):
             hour=int(input.split(":")[0])
             minute=int(input.split(":")[1])
             if hour < 0 or hour > 23 or minute < 0 or minute > 59:
-                tk.messagebox.showerror("Eingabefehler", "Bitte geben sie eine gültige Uhrzeit ein oder die Anzahl der Stunden mit vorangestelltem -")
+                tk.messagebox.showerror("Eingabefehler", u"Bitte geben sie eine gültige Uhrzeit ein oder die Anzahl der Stunden mit vorangestelltem -")
                 master.nametowidget(name).focus()
                 return False
             else:
@@ -239,7 +239,7 @@ def buildGUI_1():
 def buildGUI_2():
     #add autostart checkbox
     row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
-    lab=tk.Label(row,text="Grüne Signale automatisch starten",width=30,anchor='w')
+    lab=tk.Label(row,text=u"Grüne Signale automatisch starten",width=30,anchor='w')
     obj=tk.Checkbutton(row,text="aktiv",variable=doAutostart,command=setDirty)
     row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
     lab.pack(side=tk.LEFT,pady=dy,padx=dx)
@@ -257,7 +257,7 @@ def buildGUI_3():
 def buildGUI_4():
     #add entry field for remoteURL
     row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
-    lab=tk.Label(row,text="Remote-URL (leer für Offline-Modus)",width=30,anchor='w')
+    lab=tk.Label(row,text=u"Remote-URL (leer für Offline-Modus)",width=30,anchor='w')
     if inited == True:
         remoteURL.set(introURL)
     obj=tk.Entry(row,textvariable=remoteURL,validate="key",validatecommand=(anyEntryCallback, '%P'))
@@ -268,7 +268,7 @@ def buildGUI_4():
 def buildGUI_5():
     #add scale widget for duration
     row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
-    lab=tk.Label(row,text="Anzeigedauer für Bilder (Sekunden)",width=30,anchor='w')
+    lab=tk.Label(row,text=u"Anzeigedauer für Bilder (Sekunden)",width=30,anchor='w')
     obj=tk.Scale(row,from_=5,to=120,variable=bild_dauer,orient=tk.HORIZONTAL,command=setDirty)
     row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
     lab.pack(side=tk.LEFT,pady=dy,padx=dx)
@@ -320,7 +320,7 @@ def buildGUI_7():
 def buildGUI_8():
     #add buttons
     row=tk.Frame(master)
-    saveButton=tk.Button(row,text="Übernehmen",command=save,pady=4,padx=dx)
+    saveButton=tk.Button(row,text=u"Übernehmen",command=save,pady=4,padx=dx)
     saveButton.pack(side=tk.LEFT,pady=dy,padx=dx)
     quitButton=tk.Button(row,text="Beenden",command=quit,pady=4,padx=dx)
     quitButton.pack(side=tk.RIGHT,pady=dy,padx=dx)
@@ -341,7 +341,7 @@ readConfig()
 
 master.minsize(600,300)
 master.geometry("800x450+560+300")
-master.title("Einstellungen für Grüne Signale")
+master.title(u"Einstellungen für Grüne Signale")
 master.option_add('*Dialog.msg.font', 'System 10')
 
 #register callbacks for entry fields
