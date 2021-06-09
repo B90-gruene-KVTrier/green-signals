@@ -270,7 +270,7 @@ class MySlideShow(tk.Toplevel):
                 tk.messagebox.showerror("Keine Medien gefunden", "Das Verzeichnis\n'"+localPath+"'\nwurde nicht gefunden.")
                 exit(0)
         #get Media Files
-        self.showInfo(u"Grüne Signale wird gestartet", True)
+        self.showInfo("Gruene Signale wird gestartet", True)
         time.sleep(1)
         self.updateMedia()
 
