@@ -1,2 +1,20 @@
+# Git Ignore File for Gruene-Signale
+
+# ignore the download.zip, that get created
+# when running the script from repository
+# with a remote URL configured
 download.zip
-slideshow/*
+
+# ignore the CONF file
+# this by intention shall be created on first run
+gruene-signale.conf
+
+# ignore the out path
+# this gets created when running buildzip.sh
+# to prepare gruene-signale.zip for distribution
+out
+
+# ignore the slideshow path
+# this gets created when running the script
+# inside th repository
+slideshow
