@@ -7,7 +7,7 @@ download.zip
 
 # ignore the CONF file
 # this by intention shall be created on first run
-gruene-signale.conf
+gruene_signale.conf
 
 # ignore the out path
 # this gets created when running buildzip.sh
