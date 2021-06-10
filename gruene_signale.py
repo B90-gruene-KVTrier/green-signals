@@ -47,12 +47,17 @@ movie_extensions = ['mov', 'mp4', 'm4v']
 #start update with 2nd media - but only once
 update=0
 
-#some variables related to system clock and energ savings
+#some variables related to system clock and energy savings and timed events
 clockInSync=False
 clockTimer=None
+energySavingMode = 0
+energySavingStart = time.gmtime(0)
+energySavingEnd = time.gmtime(0)
+energySavingsDuration = 0
 
 def readConfig(configFile=None):
     global bild_dauer, DEBUG_PREVIEW, localPath, remoteURL, localPathExists
+    global energySavingMode, energySavingStart, energySavingEnd, energySavingsDuration 
     needsWrite = False
     pathToMe = os.path.realpath(sys.argv[0])
     if configFile == None:
@@ -87,6 +92,53 @@ def readConfig(configFile=None):
             remoteURL = None
     except:
         remoteURL = None
+        
+    #try to read energySaving Info
+    try:
+        val = int(config.get('energy','mode'))
+    except:
+        val = 0
+        config.set('energy','mode',0)
+        config.set('energy','start',"0:00")
+        config.set('energy','stop',"0:00")
+        needsWrite=True
+    energySavingMode = val
+    
+    if enenergySavingMode > 0:
+        #when energy saving is disabled we do not need this stuff
+        h = 0
+        m = 0
+        try:
+            val = config.get('energy','start')
+            if val.startswith("-"):
+                #this is not a time but a duration, which is number of hours
+                energySavingsDuration = -int(val)
+            else:
+                h=int(val.split(":")[0])
+                m=int(val.split(":")[1])
+                energySavingStart.tm_hour = h
+                energySavingStart.tm_minute = m
+        except:
+            energySavingMode = 0
+            config.set('energy','mode',0)
+            config.set('energy','start',"0:00")
+            config.set('energy','stop',"0:00")
+            needsWrite=True
+        
+    if energySavingMode == 2:
+        # we only needs this for wakeup blanked screen
+        try:
+            val = config.get('energy','stop')
+                h=int(val.split(":")[0])
+                m=int(val.split(":")[1])
+                energySavingStop.tm_hour = h
+                energySavingStop.tm_minute = m
+        except:
+            energySavingMode = 0
+            config.set('energy','mode',0)
+            config.set('energy','start',"0:00")
+            config.set('energy','stop',"0:00")
+            needsWrite=True    
 
     if needsWrite == True:
         with open(configFile, 'w') as file:
@@ -156,7 +208,7 @@ class RemoteData:
             shutil.rmtree(localPath+".old", True, None)
         localPathExists = True
         return True
-        
+
 # this class creates an invisible window to catch keboard events
 class HiddenRoot(tk.Tk):
     def __init__(self):
