@@ -232,6 +232,32 @@ class WatchTime():
                     self.startuptime = time.localtime()
                     print("NTP clock is synced")
         
+    def checkTimeForShutdown(self):
+        #if energy saving is set to shutdown, check if it is time to sutdown
+        now = time.localtime()
+        if energySavingDuration > 0:
+            running = (now.tm_hour - self.startuptime.tm_hour) * 60 + (now.tm_minute - self.startuptime.tm_minute)
+            if energySavingDuration*60 < running:
+                #it is time to shutdown
+                self.receiver.shutdown()
+                return
+        else:
+            if self.synced == True:
+                #internal clock is synced to NTP
+                nowMinutes = now.tm_hour * 60 + now.tm_min
+                shallEnd = energySavingStart['h'] * 60 + energySavingStart['m']
+                if nowMinutes - shallEnd < 5:
+                    #time to shutdown - but only in 5 minute range around shutdown time
+                    self.receiver.shutdown()
+                return
+            else:
+                #internal clock is not synced to NTP - happens in Offline mode
+                print("NTP clock not in sync - we don't shut down")
+        return
+        
+    def checkTimeForBlank(self):
+        return
+
     def checkTimedEvents(self):
         print("checkTimedEvents",energySavingMode, energySavingDuration,energySavingStart)
         if energySavingMode == 0:
@@ -240,29 +266,11 @@ class WatchTime():
         elif energySavingMode == 1:
             if energySavingStart == None:
                 return
-            #if energy saving is set to shutdown, check if it is time to sutdown
-            now = time.localtime()
-            if energySavingDuration > 0:
-                running = (now.tm_hour - self.startuptime.tm_hour) * 60 + (now.tm_minute - self.startuptime.tm_minute)
-                if energySavingDuration*60 < running:
-                    #it is time to shutdown
-                    self.receiver.shutdown()
-                    return
-            else:
-                if self.synced == True:
-                    #internal clock is synced to NTP
-                    nowMinutes = now.tm_hour * 60 + now.tm_min
-                    shallEnd = energySavingStart['h'] * 60 + energySavingStart['m']
-                    if nowMinutes - shallEnd < 5:
-                        #time to shutdown - but only in 5 minute range around shutdown time
-                        self.receiver.shutdown()
-                    return
-                else:
-                    #internal clock is not synced to NTP - happens in Offline mode
-                    print("NTP clock not in sync - we don't shut down")
+            self.checkTimeForShutdown()
             return
         elif energySavingMode == 2:
             #if energysaving is set to blank screen, check if we need to change someting
+            self.checkTimeForBlank()
             return
         else:
             #we should never reach here
