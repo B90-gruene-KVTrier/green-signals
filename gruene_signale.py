@@ -111,7 +111,7 @@ def readConfig(configFile=None):
             val = config.get('energy','start')
             if val.startswith("-"):
                 #this is not a time but a duration, which is number of hours
-                energySavingsDuration = -int(val)
+                energySavingDuration = -int(val)
             else:
                 h=int(val.split(":")[0])
                 m=int(val.split(":")[1])
@@ -274,6 +274,44 @@ class WatchTime():
         return
         
     def checkTimeForBlank(self):
+        isBlanked = self.receiver.window.blanked
+        print( "Screen is Blanked?", isBlanked)
+        if energySavingDuration > 0:
+            blankFrom = (self.hhmmToMinutes(self.startuptime) + (24-energySavingDuration) * 60) % (24*60)
+            blankTill = self.hhmmToMinutes(self.startuptime)
+        else:
+            if self.synced == True:
+                blankFrom = self.dictToMinutes(energySavingStart)
+                blankTill = self.dictToMinutes(energySavingEnd)
+            else:
+                blankFrom = (self.hhmmToMinutes(self.startuptime) + (24-energySavingDuration) * 60) % (24*60)
+                blankTill = self.hhmmToMinutes(self.startuptime)
+        now = self.hhmmToMinutes(time.localtime())
+        needsBlank = None
+        if blankFrom > blankTill:
+            #eg: 23:00 till 5:00
+            if now > blankFrom or now < blankTill:
+                needsBlank = True
+            else:
+                needsBlank = False
+        elif blankFrom < blankTill:
+            #eg: 1:00 till 5:00
+            if now > blankFrom and now < blankTill:
+                needsBlank = True
+            else:
+                needsBlank = False
+        else:
+            #nothing to do - start and end time are equal
+            return
+            
+        if needsBlank == None:
+            return
+        elif needsBlank == True and isBlanked == False:
+            if self.receiver.window.inited == True:
+                # only start blanking, when slide show was inited - postpone otherwise
+                self.receiver.window.blankScreenOn()
+        elif needsBlank == False and isBlanked == True:
+            self.receiver,window,blankScreenOff()
         return
 
     def checkTimedEvents(self):
@@ -333,6 +371,9 @@ class HiddenRoot(tk.Tk):
 
     def destroy(self):
         self.window.player.stop()
+        if self.window.blanked == True:
+            #in case we are blanked right now, turn enable screen again
+            self.window.blankScreenOff()
         self.window.destroy()
         exit(0)
 
@@ -375,6 +416,8 @@ class MySlideShow(tk.Toplevel):
         #intialize the timer for the slideshow
         self.paused = False
         self.timer = None
+        self.blanked = False
+        self.inited = False # this gets set once the slideshow was started
 
         #set the geometry of the playback window
         self.scr_w, self.scr_h = self.winfo_screenwidth(), self.winfo_screenheight()
@@ -527,6 +570,7 @@ class MySlideShow(tk.Toplevel):
     def updateMedia(self):
         global update
         self.pausePlayback()
+        self.inited = False
         if remoteURL != None:
             self.showInfo("Neue Medien werden geladen", True)
             time.sleep(2)
@@ -539,19 +583,24 @@ class MySlideShow(tk.Toplevel):
         self.getMedia()
         self.hideInfo()
         self.resumePlayback()
+        self.inited = True
         self.nextMedia()
         
     def blankScreenOn(self):
         #energy savings - start blank screen
         self.pausePlayback()
+        self.blanked = True
         subprocess.check_call(["vcgencmd","display_power","0"])
-        time.sleep(10)
-        self.blankScreenOff()
+        if DEBUG_PREVIEW == True:
+            #while debugging we want screen blanking turn off right away
+            time.sleep(5)
+            self.blankScreenOff()
         
     def blankScreenOff(self):
         #energy savings - end blank screen
-        self.updateMedia()
+        self.blanked = False
         subprocess.check_call(["vcgencmd","display_power","1"])
+        self.updateMedia()
 
     def GetHandle(self):
         return self.videopanel.winfo_id()
