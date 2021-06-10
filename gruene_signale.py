@@ -53,11 +53,11 @@ clockTimer=None
 energySavingMode = 0
 energySavingStart = time.gmtime(0)
 energySavingEnd = time.gmtime(0)
-energySavingsDuration = 0
+energySavingDuration = 0
 
 def readConfig(configFile=None):
     global bild_dauer, DEBUG_PREVIEW, localPath, remoteURL, localPathExists
-    global energySavingMode, energySavingStart, energySavingEnd, energySavingsDuration 
+    global energySavingMode, energySavingStart, energySavingEnd, energySavingDuration
     needsWrite = False
     pathToMe = os.path.realpath(sys.argv[0])
     if configFile == None:
