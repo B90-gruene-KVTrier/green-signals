@@ -155,6 +155,7 @@ class RemoteData:
             #remove old data
             shutil.rmtree(localPath+".old", True, None)
         localPathExists = True
+        return True
         
 # this class creates an invisible window to catch keboard events
 class HiddenRoot(tk.Tk):
