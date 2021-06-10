@@ -49,8 +49,8 @@ update=0
 
 #some variables related to system clock and energy savings and timed events
 energySavingMode = 0
-energySavingStart = time.gmtime(0)
-energySavingEnd = time.gmtime(0)
+energySavingStart = None
+energySavingEnd = None
 energySavingDuration = 0
 
 def readConfig(configFile=None):
@@ -101,6 +101,7 @@ def readConfig(configFile=None):
         config.set('energy','stop',"0:00")
         needsWrite=True
     energySavingMode = val
+    print("energySavingMode = ", energySavingMode)
     
     if energySavingMode > 0:
         #when energy saving is disabled we do not need this stuff
@@ -114,23 +115,22 @@ def readConfig(configFile=None):
             else:
                 h=int(val.split(":")[0])
                 m=int(val.split(":")[1])
-                energySavingStart.tm_hour = h
-                energySavingStart.tm_minute = m
+                energySavingStart = {'h':h, 'm':m}
         except:
+            print("!!!### caught reading energy start")
             energySavingMode = 0
             config.set('energy','mode',"0")
             config.set('energy','start',"0:00")
             config.set('energy','stop',"0:00")
             needsWrite=True
         
-    if energySavingMode == 2:
-        # we only needs this for wakeup blanked screen
+        #we only needs this for wakeup blanked screen
+        #oh - we also need it, in case clock is not snce to NTP
         try:
             val = config.get('energy','stop')
             h=int(val.split(":")[0])
             m=int(val.split(":")[1])
-            energySavingStop.tm_hour = h
-            energySavingStop.tm_minute = m
+            energySavingStop = {'h':h, 'm':m}
         except:
             energySavingMode = 0
             config.set('energy','mode',"0")
@@ -210,9 +210,9 @@ class RemoteData:
 # this class will handle events related to time
 # this will be energy savings and scheduling for updates
 class WatchTime():
-    def init(self):
+    def __init__(self):
         self.receiver = None # object which receives messages
-        self.synced = False # is the RasPi synched to NTP
+        self.synced = False # is the RasPi synced to NTP
         self.startuptime = time.localtime()
         self.timer = None # reoccuring call
         self.enegerySaving = False # on restart we surely do not run in energy saving mode
@@ -229,13 +229,37 @@ class WatchTime():
             for line in subprocess.check_output(["timedatectl","show"]).split():
                 if line.decode().split("=")[0] == "NTPSynchronized" and line.decode().split("=")[1] == "yes":
                     self.synced=True
+                    self.startuptime = time.localtime()
+                    print("NTP clock is synced")
         
     def checkTimedEvents(self):
+        print("checkTimedEvents",energySavingMode, energySavingDuration,energySavingStart)
         if energySavingMode == 0:
             #if energy saving is off, we have nothing to do
             return
         elif energySavingMode == 1:
+            if energySavingStart == None:
+                return
             #if energy saving is set to shutdown, check if it is time to sutdown
+            now = time.localtime()
+            if energySavingDuration > 0:
+                running = (now.tm_hour - self.startuptime.tm_hour) * 60 + (now.tm_minute - self.startuptime.tm_minute)
+                if energySavingDuration*60 < running:
+                    #it is time to shutdown
+                    self.receiver.shutdown()
+                    return
+            else:
+                if self.synced == True:
+                    #internal clock is synced to NTP
+                    nowMinutes = now.tm_hour * 60 + now.tm_min
+                    shallEnd = energySavingStart['h'] * 60 + energySavingStart['m']
+                    if nowMinutes - shallEnd < 5:
+                        #time to shutdown - but only in 5 minute range around shutdown time
+                        self.receiver.shutdown()
+                    return
+                else:
+                    #internal clock is not synced to NTP - happens in Offline mode
+                    print("NTP clock not in sync - we don't shut down")
             return
         elif energySavingMode == 2:
             #if energysaving is set to blank screen, check if we need to change someting
