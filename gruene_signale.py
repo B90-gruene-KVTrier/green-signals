@@ -48,8 +48,6 @@ movie_extensions = ['mov', 'mp4', 'm4v']
 update=0
 
 #some variables related to system clock and energy savings and timed events
-clockInSync=False
-clockTimer=None
 energySavingMode = 0
 energySavingStart = time.gmtime(0)
 energySavingEnd = time.gmtime(0)
@@ -104,7 +102,7 @@ def readConfig(configFile=None):
         needsWrite=True
     energySavingMode = val
     
-    if enenergySavingMode > 0:
+    if energySavingMode > 0:
         #when energy saving is disabled we do not need this stuff
         h = 0
         m = 0
@@ -120,7 +118,7 @@ def readConfig(configFile=None):
                 energySavingStart.tm_minute = m
         except:
             energySavingMode = 0
-            config.set('energy','mode',0)
+            config.set('energy','mode',"0")
             config.set('energy','start',"0:00")
             config.set('energy','stop',"0:00")
             needsWrite=True
@@ -129,13 +127,13 @@ def readConfig(configFile=None):
         # we only needs this for wakeup blanked screen
         try:
             val = config.get('energy','stop')
-                h=int(val.split(":")[0])
-                m=int(val.split(":")[1])
-                energySavingStop.tm_hour = h
-                energySavingStop.tm_minute = m
+            h=int(val.split(":")[0])
+            m=int(val.split(":")[1])
+            energySavingStop.tm_hour = h
+            energySavingStop.tm_minute = m
         except:
             energySavingMode = 0
-            config.set('energy','mode',0)
+            config.set('energy','mode',"0")
             config.set('energy','start',"0:00")
             config.set('energy','stop',"0:00")
             needsWrite=True    
@@ -209,6 +207,54 @@ class RemoteData:
         localPathExists = True
         return True
 
+# this class will handle events related to time
+# this will be energy savings and scheduling for updates
+class WatchTime():
+    def init(self):
+        self.receiver = None # object which receives messages
+        self.synced = False # is the RasPi synched to NTP
+        self.startuptime = time.localtime()
+        self.timer = None # reoccuring call
+        self.enegerySaving = False # on restart we surely do not run in energy saving mode
+    
+    def setReceiver(self,receiver=None):
+        if receiver == None:
+            return
+        self.receiver = receiver
+        return
+    
+    def checkNTPClock(self):
+        if self.synced != True:
+            # timedatectl show tells me, if the clock is synchronized via NTP
+            for line in subprocess.check_output(["timedatectl","show"]).split():
+                if line.decode().split("=")[0] == "NTPSynchronized" and line.decode().split("=")[1] == "yes":
+                    self.synced=True
+        
+    def checkTimedEvents(self):
+        if energySavingMode == 0:
+            #if energy saving is off, we have nothing to do
+            return
+        elif energySavingMode == 1:
+            #if energy saving is set to shutdown, check if it is time to sutdown
+            return
+        elif energySavingMode == 2:
+            #if energysaving is set to blank screen, check if we need to change someting
+            return
+        else:
+            #we should never reach here
+            abort()
+            
+    def update(self):
+        if self.receiver == None:
+            return
+        print("WatchTime.update()"+time.asctime())
+        #check is clock is synced to NTP
+        self.checkNTPClock()
+        #check if a timed event is up
+        self.checkTimedEvents()
+        #repeat every Minute
+        self.timer = self.receiver.after(60000,self.update)
+        
 # this class creates an invisible window to catch keboard events
 class HiddenRoot(tk.Tk):
     def __init__(self):
@@ -251,14 +297,16 @@ class Mediafile:
         self.valid = False
         extension = os.path.basename(filename).split(".")[-1]
         if extension in image_extensions:
-            print("image file:        "+os.path.basename(filename))
+            if DEBUG_PREVIEW == True:
+                print("image file:        "+os.path.basename(filename))
             self.valid = True
         elif extension in movie_extensions:
             media = caller.instance.media_new(filename)
             media.parse()
             self.duration = media.get_duration()
             self.valid = True
-            print("movie file:        "+os.path.basename(filename)+ " (%d Sekunden)"%(self.duration/1000))
+            if DEBUG_PREVIEW == True:
+                print("movie file:        "+os.path.basename(filename)+ " (%d Sekunden)"%(self.duration/1000))
         else:
             print("unknwon file type: "+os.path.basename(filename))
 
@@ -455,15 +503,6 @@ class MySlideShow(tk.Toplevel):
         self.updateMedia()
         subprocess.check_call(["vcgencmd","display_power","1"])
 
-    def checkNTPClock(self):
-        global clockInSync
-        # timedatectl show tells me, if the clock is synchronized via NTP
-        for line in subprocess.check_output(["timedatectl","show"]).split():
-            if line.decode().split("=")[0] == "NTPSynchronized" and line.decode().split("=")[1] == "yes":
-                clockInSync=True
-        #if clockInSync == False:
-        #    clockTimer=self.after(60*1000,self.checkNTPClock)
-        
     def GetHandle(self):
         return self.videopanel.winfo_id()
 
@@ -471,6 +510,9 @@ class MySlideShow(tk.Toplevel):
 readConfig()
 
 slideShow = HiddenRoot()
+timedEvents = WatchTime()
+timedEvents.setReceiver(slideShow)
+timedEvents.update()
 
 slideShow.bind("<Escape>", lambda e: slideShow.destroy())  # exit on esc
 slideShow.bind("<Right>", lambda e: slideShow.nextMedia()) # right-arrow key for next image
@@ -478,6 +520,7 @@ slideShow.bind("<Left>", lambda e: slideShow.previousMedia()) # left-arrow key f
 slideShow.bind("U", lambda e: slideShow.window.updateMedia()) # start download of new media
 slideShow.bind("P", lambda e: slideShow.window.togglePlayback()) # toggle playback
 slideShow.bind("i", lambda e: slideShow.window.toggleInfo()) # toggle display of info widget
+
 
 if DEBUG_PREVIEW == 1:
     #some featurres are only availade whith DEBUG Preview enabled
