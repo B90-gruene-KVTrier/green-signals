@@ -22,6 +22,8 @@ import zipfile
 import requests
 # used to call to shutdown or vcgencmd
 import subprocess
+# used to validate image sizes to avoid crashes
+from PIL import Image
 
 # below lines for develepment only
 # When DEBUG_PREVIEW is set to True, then te dislay will only cover
@@ -52,6 +54,7 @@ energySavingMode = 0
 energySavingStart = None
 energySavingEnd = None
 energySavingDuration = 0
+lastUpdate = None
 
 def readConfig(configFile=None):
     global bild_dauer, DEBUG_PREVIEW, localPath, remoteURL, localPathExists
@@ -241,8 +244,9 @@ class WatchTime():
                     print("NTP clock is synced")
         
     def checkTimeForShutdown(self):
-        #if energy saving is set to shutdown, check if it is time to sutdown
+        #check if it is time to sutdown
         if energySavingDuration > 0:
+            # duration in hours is used (field set to eg. -16)
             running = self.hhmmToMinutes(time.localtime()) - self.hhmmToMinutes(self.startuptime)
             if energySavingDuration*60 < running:
                 #it is time to shutdown
@@ -314,10 +318,20 @@ class WatchTime():
             self.receiver,window,blankScreenOff()
         return
 
+    def checkTimeForUpdate(self):
+        now = self.hhmmToMinutes(time.localtime())
+        running = self.hhmmToMinutes(time.localtime()) - self.hhmmToMinutes(self.startuptime)
+        if self.synced == True:
+            #clock is synced - we run update between 3:15 and 3:30 (to avoid daylight savings change)
+            if now > 195 and now < 210:
+                self.window.updateMedia()
+        #else:
+        #    if running > 24*60 
+
     def checkTimedEvents(self):
         print("checkTimedEvents",energySavingMode, energySavingDuration,energySavingStart,energySavingEnd)
         if energySavingMode == 0:
-            #if energy saving is off, we have nothing to do
+            #if energy saving is off, we only check if update is pending
             return
         elif energySavingMode == 1:
             if energySavingStart == None:
@@ -386,11 +400,28 @@ class Mediafile:
         self.type = "unknown"
         self.duration = 0
         self.valid = False
+        resize=False
+        wscale = 1.0
+        hscale = 1.0
         extension = os.path.basename(filename).split(".")[-1]
         if extension in image_extensions:
-            if DEBUG_PREVIEW == True:
-                print("image file:        "+os.path.basename(filename))
+            img = Image.open(filename)
+            w,h = img.size
+            if w > 1920:
+                wscale = 1920.0/float(w)
+                resize = True
+            if h > 1080:
+                hscale = 1080.0/float(h)
+                resize = True
+            if resize == True:
+                scale = min(wscale,hscale)
+                img = img.resize( (int(w*scale),int(h*scale)),resample=Image.ANTIALIAS)
+                img.save(filename)
+                w,h = img.size
+            img.close()
             self.valid = True
+            if DEBUG_PREVIEW == True:
+                print("image file:        "+os.path.basename(filename)+"(%d"%w+"x%d)"%h, "resized:",resize)
         elif extension in movie_extensions:
             media = caller.instance.media_new(filename)
             media.parse()
@@ -443,7 +474,7 @@ class MySlideShow(tk.Toplevel):
         self.instance = vlc.Instance("--no-xlib --quiet --fullscreen --")
         self.player = self.instance.media_player_new()
         self.player.video_set_scale(0)
-        self.player.video_set_aspect_ratio('16:9')
+        #self.player.video_set_aspect_ratio('16:9')
         self.player.video_set_deinterlace('auto')
         self.player.video_set_mouse_input(False)
         self.player.video_set_key_input(False)
