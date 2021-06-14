@@ -39,8 +39,10 @@ Main goal is to run a slideshow presenting end-user customizable contents with l
 * Images in JPG or PNG format, same display duration for all images as configured
 * Videos in MOV, M4V or MP4 format
 * All media shall have 16:9 landscape format
+* *media with a different aspect ratio will show black borders*
 * All media will be scaled to fill the screen
 * Best resolution is 1920x1080 pixels (FullHD)
+* *images larger than 1920x1080 are scaled down after download, which is quite slow on the Raspberry Pi*
 * Video clips are muted during playback
 * Video clips should start and end with blending from/to a black frame (playback could flicker)
 
@@ -56,7 +58,8 @@ Main goal is to run a slideshow presenting end-user customizable contents with l
 ## Development Environment
 
 * The project is developed on a Raspberry Pi 400, any Raspberry Pi model (except Pico) is fine
-* The project is intended to run on Raspbian Linux
+* Raspberry Pi 1 and Zero models may partially work (limitatons with video playback)
+* The project is intended to run on "Raspberry Pi OS" (based on Debian Buster)
 * *support for other platforms is possible, but not tested*
 
 ## TODOs
@@ -68,7 +71,7 @@ Main goal is to run a slideshow presenting end-user customizable contents with l
 - [x]    write configuration file
 - [x]    user friendly GUI
 - [x] configuration script *(included in setup.py)*
-- [ ]    add cronjob for safe shutdown at given time
+- [x]    add cronjob for safe shutdown at given time *(obsolete, handled internally)*
 - [ ]    validation that remote URL points to a ZIP file.
 - [ ] improve on-barding
 - [ ]    so far only dummy images for intial slideshow
