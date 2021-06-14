@@ -533,6 +533,7 @@ class MySlideShow(tk.Toplevel):
             for f in files:
                 if f.startswith("._"):
                     continue
+                self.showInfo("Analysiere '%s'" % f)
                 item = Mediafile(os.path.join(root, f),self)
                 if item.valid == True:
                     self.mediaList.append(item)
