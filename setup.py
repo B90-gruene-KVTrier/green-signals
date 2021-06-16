@@ -8,9 +8,6 @@ import tkinter as tk
 # imporrt the standard to read and write config files
 import configparser
 
-#the main window
-master=tk.Tk()
-
 #list of required modules
 modules=list()
 try:
@@ -22,26 +19,6 @@ except:
 #     import crontab
 # except:
 #     modules.append("python-crontab")
-
-#init variables used in config file and some other places
-doAutostart=tk.IntVar()
-bild_dauer=tk.IntVar()
-DEBUG_PREVIEW=tk.IntVar()
-localPath=tk.StringVar()
-remoteURL=tk.StringVar()
-energyMode=tk.IntVar()
-energyStart=tk.StringVar()
-energyStop=tk.StringVar()
-
-
-#when setup can't find the conf file, inited is set to True
-inited = False
-#URL for the Intro-Screens, use as default, if conf is inited
-introURL="https://wolke.netzbegruenung.de/s/2TPGWN5FtWYy2d8/download"
-
-#set "dirty" flag to False
-#any change should set it to True, so we can ask on quit to save data
-isDirty=False
 
 def createAutostart():
     '''
@@ -91,6 +68,52 @@ def installModules():
             print("install module %s failed" % module)
             failed.append(module)
     modules=failed
+
+#the main window
+try:
+    master=tk.Tk()
+except:
+    if len(sys.argv)>1:
+        # started from command line with arguments
+        if "modinst" in sys.argv:
+            installModules()
+            print("Die Module wurden erfolgreich installiert.")
+        if "autostart" in sys.argv:
+            createAutostart()
+            print("Das Autostart-Objekt wurde erstellt.")
+        if "noautostart" in sys.argv:
+            removeAutostart()
+            print("Das Autostart-Objekt wurde entfernt.")
+        
+    else:
+        print("Es ist ein Tcl-Fehler aufgetreten. Das Skript muss im Desktop-Modus gestartet werden.")
+        print("""Folgende Kommandos sind erlaubt:
+   modinst:     wenn notwendig werden fehlende Python Module installiert
+   autostart:   Das Autostart-Objekt wird geschrieben
+   noautostart: Das Autostart-Objekt wird entfernt
+
+Die weiteren Enstellungen koennen in der Datei gruene-signal.conf angepasst werden.""")
+    exit(0)
+
+#init variables used in config file and some other places
+doAutostart=tk.IntVar()
+bild_dauer=tk.IntVar()
+DEBUG_PREVIEW=tk.IntVar()
+localPath=tk.StringVar()
+remoteURL=tk.StringVar()
+energyMode=tk.IntVar()
+energyStart=tk.StringVar()
+energyStop=tk.StringVar()
+
+
+#when setup can't find the conf file, inited is set to True
+inited = False
+#URL for the Intro-Screens, use as default, if conf is inited
+introURL="https://wolke.netzbegruenung.de/s/2TPGWN5FtWYy2d8/download"
+
+#set "dirty" flag to False
+#any change should set it to True, so we can ask on quit to save data
+isDirty=False
 
 def validateTimeFields(input,newchar,action,name):
     if action == "focusout":
@@ -238,6 +261,7 @@ def buildGUI_1():
     
 def buildGUI_2():
     #add autostart checkbox
+    doAutostart.set(checkAutostartfile())
     row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
     lab=tk.Label(row,text="Gruene Signale automatisch starten",width=30,anchor='w')
     obj=tk.Checkbutton(row,text="aktiv",variable=doAutostart,command=setDirty)
