@@ -640,7 +640,11 @@ class MySlideShow(tk.Toplevel):
 ## ENTRY POINT ##
 readConfig()
 
-slideShow = HiddenRoot()
+try:
+    slideShow = HiddenRoot()
+except:
+    print("Es ist ein Tcl-Fehler aufgetreten. Das Skript muss im Desktop-Modus gestartet werden.")
+    exit(0)
 timedEvents = WatchTime()
 timedEvents.setReceiver(slideShow)
 timedEvents.update()
