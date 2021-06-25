@@ -257,7 +257,7 @@ class WatchTime():
                 #internal clock is synced to NTP
                 now = self.hhmmToMinutes(time.localtime())
                 shallEnd = energySavingStart['h'] * 60 + energySavingStart['m']
-                if now - shallEnd < 5:
+                if now > shallEnd and now < shallEnd+5:
                     #time to shutdown - but only in 5 minute range around shutdown time
                     self.receiver.shutdown()
                 return
@@ -269,7 +269,7 @@ class WatchTime():
                 running = self.hhmmToMinutes(time.localtime()) - self.hhmmToMinutes(self.startuptime)
                 shallRun = self.dictToMinutes(energySavingEnd) - self.dictToMinutes(energySavingStart)
                 if shallRun < 0:
-                    #incase we have entered start at 1:00 and end at 5:00, we need to add 24 hours
+                    #in case we have entered start at 1:00 and end at 5:00, we need to add 24 hours
                     shallRun += 24*60
                 if running > shallRun:
                     #it runs longer than expected, so we shut down
@@ -329,7 +329,12 @@ class WatchTime():
         #    if running > 24*60 
 
     def checkTimedEvents(self):
-        print("checkTimedEvents",energySavingMode, energySavingDuration,energySavingStart,energySavingEnd)
+        #print("checkTimedEvents - mode:",energySavingMode, " duration:",energySavingDuration," start:",energySavingStart," stop:", energySavingEnd)
+        #print("   Now  : ", self.hhmmToMinutes(time.localtime()))
+        #if energySavingStart != None:
+        #    print("   Start: ", self.dictToMinutes(energySavingStart))
+        #if energySavingEnd != None:
+        #    print("   Stop : ", self.dictToMinutes(energySavingEnd))
         if energySavingMode == 0:
             #if energy saving is off, we only check if update is pending
             return
@@ -355,7 +360,10 @@ class WatchTime():
         #check if a timed event is up
         self.checkTimedEvents()
         #repeat every Minute
-        self.timer = self.receiver.after(60000,self.update)
+        delay = 60000 # one minute
+        if DEBUG_PREVIEW == True:
+            delay = 1000
+        self.timer = self.receiver.after(delay,self.update)
         
 # this class creates an invisible window to catch keboard events
 class HiddenRoot(tk.Tk):
