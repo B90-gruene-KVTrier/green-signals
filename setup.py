@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import tkinter as tk
+import time
 
 # imporrt the standard to read and write config files
 import configparser
@@ -15,6 +16,7 @@ try:
 except:
     modules.append("python-vlc")
 
+master=None
 # try:
 #     import crontab
 # except:
@@ -63,6 +65,7 @@ def installModules():
     failed=list()
     for module in modules:
         try:
+            #subprocess.check_call(["sleep", "5"])
             subprocess.check_call([sys.executable, "-m", "pip", "install", module])
         except:
             print("install module %s failed" % module)
@@ -115,6 +118,46 @@ introURL="https://wolke.netzbegruenung.de/s/2TPGWN5FtWYy2d8/download"
 #any change should set it to True, so we can ask on quit to save data
 isDirty=False
 
+class Popup(tk.Toplevel):
+    """modal window requires a master"""
+    def __init__(self, master, **kwargs):
+        geo = '%(w)dx%(h)d+%(x)d+%(y)d' % {'x':master.winfo_x()+4,'y':master.winfo_y()+4,'w':master.winfo_width()-8,'h':master.winfo_height()-8}
+        print(geo)
+        tk.Toplevel.__init__(self, master, **kwargs)
+        self.overrideredirect(True)
+        self.geometry(geo) # set the position and size of the popup
+        self.configure(bg="DarkSeaGreen1")
+
+        lbl = tk.Label(self, text="Module werden installiert.",bg="DarkSeaGreen1")
+        lbl.place(relx=.5, rely=.5, anchor='c')
+
+        # The following commands keep the popup on top.
+        # Remove these if you want a program with 2 responding windows.
+        # These commands must be at the end of __init__
+        self.transient(master) # set to be on top of the main window
+        self.grab_set() # hijack all commands from the master (clicks on the main window are ignored)
+
+def open_popup():
+    if master != None:
+        print("OPEN POPUP")
+        master.popup = Popup(master)
+        master.update()
+
+def close_popup():
+    if master != None:
+        master.popup.destroy()
+        master.update()
+
+def installModulesGUI(i=0,event=None):
+    global modules
+    open_popup()
+    installModules()
+    close_popup()
+    if len(modules)==0:
+        master.installButton.configure(bg="pale green")
+        master.installButton.configure(state='disabled')
+        master.installButton.configure(text='bereits installiert.')
+
 def validateTimeFields(input,newchar,action,name):
     if action == "focusout":
         if ":" in input:
@@ -139,12 +182,23 @@ def validateTimeFields(input,newchar,action,name):
         return True
     elif newchar not in '01234567890:.':
         return False
-    setDirty()
+    if action != "forced":
+        setDirty()
     return True;
 
-def setDirty(ign=None):
+def setDirty(action=None, ign=None):
+    #this is called for buttons etc.
     global isDirty
+    #print("setDirty() called", sys._getframe().f_back.f_code.co_name, "###", action, "###", ign)
     isDirty = True
+    return True
+
+def setEntryDirty(action=None, ign=None):
+    #this gets called 
+    global isDirty
+    #print("setDirty() called", sys._getframe().f_back.f_code.co_name, "###", action, "###", ign)
+    if action != None and int(action) >= 0:
+        isDirty = True
     return True
 
 
@@ -243,7 +297,10 @@ def save():
     inited=False
 
 def quit():
-#    if isDirty == False:
+    if isDirty == True:
+        result = tk.messagebox.askyesno("ungesicherte Daten","Sollen die Einstellungen vor dem Beenden gespeichert werden?")
+        if result:
+            save()
     master.destroy()
     exit(0)
 
@@ -252,9 +309,10 @@ def buildGUI_1():
     row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
     lab=tk.Label(row,text="Python Module",width=30,anchor='w')
     if len(modules) == 0:
-        obj=tk.Label(row,text="installiert",fg="green")
+        obj=tk.Button(row,text="bereits installiert",bg="pale green",state='disabled')
     else:
-        obj=tk.Button(row,text="Installieren",command=installModules,fg="red")
+        obj=tk.Button(row,text="Installieren",command=installModulesGUI,fg="red")
+    master.installButton = obj
     row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
     lab.pack(side=tk.LEFT,pady=dy,padx=dx)
     obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
@@ -273,7 +331,7 @@ def buildGUI_3():
     #add entry field for local path
     row=tk.Frame(master,bd=1,relief=tk.SUNKEN)
     lab=tk.Label(row,text="lokaler Pfad",width=30,anchor='w')
-    obj=tk.Entry(row,textvariable=localPath,validate="key",validatecommand=(anyEntryCallback, '%P'))
+    obj=tk.Entry(row,textvariable=localPath,validate="key",validatecommand=(anyEntryCallback, '%d', '%P'))
     row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
     lab.pack(side=tk.LEFT,pady=dy,padx=dx)
     obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
@@ -284,7 +342,7 @@ def buildGUI_4():
     lab=tk.Label(row,text="Remote-URL (wenn leer: Offline-Modus)",width=30,anchor='w')
     if inited == True:
         remoteURL.set(introURL)
-    obj=tk.Entry(row,textvariable=remoteURL,validate="key",validatecommand=(anyEntryCallback, '%P'))
+    obj=tk.Entry(row,textvariable=remoteURL,validate="key",validatecommand=(anyEntryCallback, '%d','%P'))
     row.pack(side=tk.TOP,padx=dx,pady=dy,expand=tk.YES,fill=tk.X)
     lab.pack(side=tk.LEFT,pady=dy,padx=dx)
     obj.pack(side=tk.RIGHT,expand=tk.YES,fill=tk.X,padx=dx)
@@ -370,12 +428,11 @@ master.option_add('*Dialog.msg.font', 'System 10')
 
 #register callbacks for entry fields
 timeEntryCallback = master.register(validateTimeFields)
-anyEntryCallback = master.register(setDirty)
+anyEntryCallback = master.register(setEntryDirty)
 
 #fixed value for pady and padx used by pack() function
 dy=2
 dx=4
 
 buildGUI()
-
 master.mainloop()
