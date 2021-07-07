@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import tkinter as tk
+from tkinter import messagebox
 import time
 
 # imporrt the standard to read and write config files
@@ -164,7 +165,7 @@ def validateTimeFields(input,newchar,action,name):
             hour=int(input.split(":")[0])
             minute=int(input.split(":")[1])
             if hour < 0 or hour > 23 or minute < 0 or minute > 59:
-                tk.messagebox.showerror("Eingabefehler", "Bitte geben sie eine gueltige Uhrzeit ein oder die Anzahl der Stunden mit vorangestelltem -")
+                messagebox.showerror("Eingabefehler", "Bitte geben sie eine gueltige Uhrzeit ein oder die Anzahl der Stunden mit vorangestelltem -")
                 master.nametowidget(name).focus()
                 return False
             else:
@@ -298,7 +299,7 @@ def save():
 
 def quit():
     if isDirty == True:
-        result = tk.messagebox.askyesno("ungesicherte Daten","Sollen die Einstellungen vor dem Beenden gespeichert werden?")
+        result = messagebox.askyesno("ungesicherte Daten","Sollen die Einstellungen vor dem Beenden gespeichert werden?")
         if result:
             save()
     master.destroy()
